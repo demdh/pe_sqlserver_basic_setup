@@ -13,7 +13,7 @@ services:
     command: /bin/bash ./docker-entrypoint.sh
     volumes:
       - ./docker-entrypoint.sqlserver.sh:/docker-entrypoint.sh
-  engine:
+  processengine:
     container_name: processengine
     image: 5minds/atlas_engine_fullstack_server:${ENGINE_IMAGE_VERSION_TAG}
     ports:
@@ -36,3 +36,12 @@ services:
       - ./docker-entrypoint.engine.sh:/docker-entrypoint.sh
       - ./processes:/processes
       - ./extensions:/extensions
+  externaltaskhandler:
+    container_name: externaltaskhandler
+    image: externaltaskhandler:latest
+    build:
+      context: ./externaltaskhandler
+    environment: 
+      ProcessEngineUri: http://processengine:80
+    depends_on:
+      - processengine
