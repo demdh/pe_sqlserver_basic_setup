@@ -1,0 +1,30 @@
+{
+  "application": {
+    "defaultResponseLimit": 1000
+  },
+  "httpClient": {
+    "allowUnauthorizedCertificates": false
+  },
+  "tls": {
+    "useWindowsTrustStore": false
+  },
+  "logging": {
+    "outputPath": "logs"
+  },
+  "database": {
+    "dialect": "mssql",
+    "supportBigNumbers": true,
+    "resetPasswordRequestTimeToLive": 12,
+    "logging": false
+  },
+  "iam": {
+    "baseUrl": "http://localhost:5000/",
+    "claimUrl": "http://localhost:5000/claims/ensure",
+    "allowAnonymousRootAccess": true,
+    "cache": {
+      "enabled": true,
+      "cacheLifetimeInSeconds": 300,
+      "cleanupIntervalInSeconds": 5
+    }
+  }
+}
