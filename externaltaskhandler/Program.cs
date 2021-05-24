@@ -1,38 +1,78 @@
 ﻿using AtlasEngine;
+using AtlasEngine.ApiClient;
 using AtlasEngine.ExternalTasks;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
-using System;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System.Threading;
 using System.Threading.Tasks;
 
-var configuration = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json")
-    .AddEnvironmentVariables()
-    .AddCommandLine(args)
-    .Build();
+await Host.CreateDefaultBuilder(args)
+    .ConfigureAppConfiguration((context, builder) =>
+        {
+            builder.AddJsonFile("appsettings.json");
+        })
+    .ConfigureLogging((context, builder) =>
+        {
+            builder.AddConfiguration(context.Configuration.GetSection("Logging"));
+            builder.AddDebug();
+            builder.AddConsole();
+        })
+    .ConfigureServices((hostContext, services) =>
+        {
+            services.AddTransient<SampleExternalTaskHandler>();
 
-var logger = LoggerFactory
-    .Create(builder => builder.AddConfiguration(configuration.GetSection("Logging")).AddConsole())
-    .CreateLogger("externaltaskhandler");
+            services.AddHostedService<ApplicationLifecycleMonitor>();
+            services.AddOptions<ApiClientSettings>().Bind(hostContext.Configuration.GetSection("ProcessEngine:ApiClientSettings"));
+        })
+    .UseExternalTaskWorkers(opt => { })
+    .RunConsoleAsync();
 
-var externalTaskClient = ClientFactory.CreateExternalTaskClient(new Uri(configuration.GetValue<string>("ProcessEngineUri")));
+[ExternalTaskHandler(topic: "SampleExternalTask")]
+class SampleExternalTaskHandler : IExternalTaskHandler<SampleExternalTaskHandler.Payload, SampleExternalTaskHandler.Response>
+{
+    private readonly ILogger<SampleExternalTaskHandler> logger;
 
-logger.LogInformation("Start external tasks handling...");
-
-var worker = externalTaskClient.SubscribeToExternalTaskTopic(
-    "SampleExternalTask",
-    s => s.UseHandlerMethod((ExternalTaskPayload payload, ExternalTask task) =>
+    public SampleExternalTaskHandler(ILogger<SampleExternalTaskHandler> logger)
     {
-        logger.LogTrace($@"Handling external task {task.Topic} for process instance {task.ProcessInstanceId}{Environment.NewLine}
-                        External task data: '{payload.Data}'");
-        return Task.FromResult(new ExternalTaskResponse());
-    }));
+        this.logger = logger;
+    }
 
-logger.LogInformation("External task handling started.");
-logger.LogInformation("Press CTRL+C to exit");
+    public Task<Response> HandleAsync(Payload payload, ExternalTask task)
+    {
+        logger.LogInformation($"Handling external task {task.Topic} (FlowNodeId {task.FlowNodeInstanceId})");
+        logger.LogTrace($"External task data: '{payload.Data}' (FlowNodeId {task.FlowNodeInstanceId})");
 
-await worker.StartAsync();
+        return Task.FromResult(new Response());
+    }
 
-record ExternalTaskPayload(string Data);
+    public record Payload(string Data);
 
-record ExternalTaskResponse();
+    public record Response();  
+}
+
+class ApplicationLifecycleMonitor : IHostedService
+{
+    private readonly ILogger logger;
+
+    public ApplicationLifecycleMonitor(ILogger<ApplicationLifecycleMonitor> logger)
+    {
+        this.logger = logger;
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        logger.LogInformation("External task handling started...");
+        logger.LogInformation("Press CTRL+C to exit");
+
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        logger.LogInformation("External task handling was stopped.");
+
+        return Task.CompletedTask;
+    }
+}
