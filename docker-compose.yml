@@ -17,10 +17,9 @@ services:
     container_name: processengine
     image: 5minds/atlas_engine_fullstack_server:${ENGINE_IMAGE_VERSION_TAG}
     ports:
-      - ${ENGINE_PORT_EXTERNAL}:80
+      - ${ENGINE_PORT_EXTERNAL}:10560
     environment:
       application__name: ${ENGINE_APPLICATION_NAME}
-      httpServer__port: 80
       NODE_OPTIONS: --max_old_space_size=8000
       CONFIG_PATH: /mnt/config/mssql.json
       database__host: sqlserver
